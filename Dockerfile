@@ -22,6 +22,6 @@ USER 1000
 WORKDIR /app/
 
 COPY --from=builder /app/node_modules /app/node_modules
-COPY --from=builder /app/dist/src /app/
+COPY --from=builder /app/dist /app/
 
 CMD ["node", "index.js"]

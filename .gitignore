@@ -4,3 +4,4 @@ result.json
 *.csv
 .env
 dist/
+deploy.sh

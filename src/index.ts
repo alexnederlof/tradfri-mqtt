@@ -39,9 +39,13 @@ async function connectToMqtt(config: AppConfig) {
       password: config.mqtt.password,
       clientId: "tradfri2mqtt",
     });
+    let connectedBefore = false;
     client.on("connect", () => {
-      console.log("Connected to MQTT!");
-      res(client);
+      if (!connectedBefore) {
+        connectedBefore = true;
+        console.log("Connected to MQTT!");
+        res(client);
+      }
     });
     client.on("error", (e) => reject(e));
   });

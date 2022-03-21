@@ -1,13 +1,35 @@
 import { Client as MqttClient } from "mqtt";
-import { Accessory, TradfriClient } from "node-tradfri-client";
+import {
+  Accessory,
+  AccessoryTypes,
+  Light,
+  Sensor,
+  Plug,
+  TradfriClient,
+} from "node-tradfri-client";
+
+const DEVICE_TYPES: { [key in AccessoryTypes]: string } = {
+  [AccessoryTypes.remote]: "remote",
+  [AccessoryTypes.airPurifier]: "air-purifier",
+  [AccessoryTypes.blind]: "blind",
+  [AccessoryTypes.lightbulb]: "lightbulb",
+  [AccessoryTypes.motionSensor]: "motion",
+  [AccessoryTypes.plug]: "plug",
+  [AccessoryTypes.remote]: "remote",
+  [AccessoryTypes.signalRepeater]: "repeater",
+  [AccessoryTypes.slaveRemote]: "slave",
+  [AccessoryTypes.soundRemote]: "sound-remote",
+};
 
 export class Bridge {
+  private readonly cache = new Map<number, { [key: string]: string }>();
+
   constructor(private mqtt: MqttClient, private tradfri: TradfriClient) {}
 
   public start() {
     this.tradfri
-      .on("device updated", this.onDeviceUpdate)
-      .on("device removed", this.onDeviceRemoval)
+      .on("device updated", this.onDeviceUpdate.bind(this))
+      .on("device removed", this.onDeviceRemoval.bind(this))
       .observeDevices();
   }
 
@@ -19,11 +41,159 @@ export class Bridge {
     console.log("Shutdown complete");
   }
 
-  private onDeviceUpdate(device: Accessory) {
-    console.log("Got update ", device);
+  private async onDeviceUpdate(device: Accessory) {
+    // console.log("Got update ", device);
+    const baseMqttPath = `tradfri/${DEVICE_TYPES[device.type] || device.type}/${
+      device.instanceId
+    }`;
+    await this.updateAccessoryData(device, baseMqttPath);
+    await this.updateDeviceInfo(device, baseMqttPath);
+    switch (device.type) {
+      case AccessoryTypes.lightbulb:
+        let lightValues: Array<keyof Light> = [
+          "onOff",
+          "powerFactor",
+          "colorTemperature",
+          "dimmer",
+        ];
+        for await (const key of lightValues) {
+          await this.updateIfChanged(
+            device.instanceId,
+            key,
+            this.toStringOrEmpty(device.lightList[0][key]),
+            baseMqttPath
+          );
+        }
+        break;
+      case AccessoryTypes.motionSensor:
+        const sensorValues: Array<keyof Sensor> = [
+          "sensorType",
+          "minMeasuredValue",
+          "maxMeasuredValue",
+          "minRangeValue",
+          "maxRangeValue",
+          "resetMinMaxMeasureValue",
+          "sensorValue",
+        ];
+        for await (const key of sensorValues) {
+          await this.updateIfChanged(
+            device.instanceId,
+            key,
+            this.toStringOrEmpty(device.sensorList[0][key]),
+            baseMqttPath
+          );
+        }
+        break;
+      case AccessoryTypes.plug:
+        const plugValues: Array<keyof Plug> = [
+          "onOff",
+          "powerFactor",
+          "dimmer",
+        ];
+        for await (const key of plugValues) {
+          await this.updateIfChanged(
+            device.instanceId,
+            key,
+            this.toStringOrEmpty(device.plugList[0][key]),
+            baseMqttPath
+          );
+        }
+        break;
+    }
+  }
+
+  private async updateAccessoryData(device: Accessory, baseMqttPath: string) {
+    device = device.fixBuggedProperties();
+    const toInspect: Array<keyof Accessory> = [
+      "instanceId",
+      "name",
+      "alive",
+      "otaUpdateState",
+      "type",
+    ];
+    for await (const key of toInspect) {
+      await this.updateIfChanged(
+        device.instanceId,
+        key,
+        this.toStringOrEmpty(device[key]),
+        baseMqttPath
+      );
+    }
+    await this.updateIfChanged(
+      device.instanceId,
+      "lastSeen",
+      new Date(device.lastSeen * 1000).toISOString(),
+      baseMqttPath
+    );
+  }
+
+  private async updateDeviceInfo(device: Accessory, baseMqttPath: string) {
+    const toInspect: Array<keyof Accessory["deviceInfo"]> = [
+      "battery",
+      "firmwareVersion",
+      "modelNumber",
+      "power",
+    ];
+    const devInfo = device.deviceInfo.fixBuggedProperties();
+    for await (const key of toInspect) {
+      await this.updateIfChanged(
+        device.instanceId,
+        key,
+        this.toStringOrEmpty(devInfo[key]),
+        baseMqttPath
+      );
+    }
+  }
+
+  private async updateIfChanged(
+    device: number,
+    key: string,
+    value: string,
+    basePath: string
+  ) {
+    let changed = false;
+    let path = basePath + `/` + key;
+    let cached = this.cache.get(device);
+    if (cached) {
+      changed = cached[key] !== value;
+      cached[key] = value;
+    } else {
+      changed = true;
+      this.cache.set(device, { [key]: value });
+    }
+    if (changed) {
+      console.debug(`Publishing ${path}: ${value}`);
+      try {
+        if (value === null || value === undefined) {
+          await this.publish(path, "");
+        } else await this.publish(path, value);
+      } catch (e) {
+        console.error(`Could not publish ${key} : ${value}: ${e}`, e);
+      }
+    }
   }
 
   private onDeviceRemoval(instance: number) {
     console.log("Device removed ", instance);
+  }
+
+  private async publish(key: string, value: string) {
+    return new Promise<number | undefined>((res, rej) =>
+      this.mqtt.publish(key, value, (err, ok) => {
+        if (err) {
+          rej(err);
+        } else {
+          res(ok?.messageId);
+        }
+      })
+    );
+  }
+
+  private toStringOrEmpty(value: any): string {
+    if (value === null || value === undefined) {
+      return "";
+    } else {
+      return `${value}`;
+    }
   }
 }
