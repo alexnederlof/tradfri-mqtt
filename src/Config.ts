@@ -3,8 +3,8 @@ import { allowedNodeEnvironmentFlags } from "process";
 export interface AppConfig {
   readonly mqtt: {
     address: string;
-    user: string;
-    password: string;
+    user?: string;
+    password?: string;
     topicPrefix: string;
   };
   readonly gateway: {
@@ -18,8 +18,8 @@ export function parse(): AppConfig {
   return {
     mqtt: {
       address: getOrError("MQTT_ADDRESS"),
-      user: getOrError("MQTT_USER"),
-      password: getOrError("MQTT_PASSWORD"),
+      user: process.env["MQTT_USER"]?.trim(),
+      password: process.env["MQTT_PASSWORD"]?.trim(),
       topicPrefix: process.env["MQTT_TOPIC_PREFIX"]?.trim() || "tradfri",
     },
     gateway: {
