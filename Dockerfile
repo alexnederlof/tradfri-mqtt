@@ -1,8 +1,4 @@
-FROM node:lts-slim as node-tls
-# RUN apt update 
-# RUN apt install -y openssl
-
-FROM node-tls as builder
+FROM node:lts-slim as builder
 WORKDIR /app/
 ADD tsconfig.json /app/
 ADD package.json /app/
@@ -17,7 +13,7 @@ RUN yarn build
 RUN rm -rf node_modules
 RUN yarn install --prod
 
-FROM node-tls as runner
+FROM node:lts-slim as runner
 USER 1000
 WORKDIR /app/
 
