@@ -1,10 +1,13 @@
 import { Client as MqttClient } from "mqtt";
+import { AppConfig } from "./Config";
 import {
   Accessory,
   AccessoryTypes,
   Light,
   Sensor,
   Plug,
+  Blind,
+  AirPurifier,
   TradfriClient,
 } from "node-tradfri-client";
 
@@ -24,7 +27,11 @@ const DEVICE_TYPES: { [key in AccessoryTypes]: string } = {
 export class Bridge {
   private readonly cache = new Map<number, { [key: string]: string }>();
 
-  constructor(private mqtt: MqttClient, private tradfri: TradfriClient) {}
+  constructor(
+    private mqtt: MqttClient,
+    private tradfri: TradfriClient,
+    private config: AppConfig
+  ) {}
 
   public start() {
     this.tradfri
@@ -43,62 +50,100 @@ export class Bridge {
 
   private async onDeviceUpdate(device: Accessory) {
     // console.log("Got update ", device);
-    const baseMqttPath = `tradfri/${DEVICE_TYPES[device.type] || device.type}/${
-      device.instanceId
-    }`;
+    const baseMqttPath = `${this.config.mqtt.topicPrefix}/${
+      DEVICE_TYPES[device.type] || device.type
+    }/${device.instanceId}`;
     await this.updateAccessoryData(device, baseMqttPath);
     await this.updateDeviceInfo(device, baseMqttPath);
     switch (device.type) {
+      case AccessoryTypes.remote:
+      case AccessoryTypes.slaveRemote:
+      case AccessoryTypes.soundRemote:
+      case AccessoryTypes.signalRepeater:
+        // not relevant
+        break;
+      case AccessoryTypes.blind:
+        await this.updateDeviceSpecifics(
+          device.instanceId,
+          baseMqttPath,
+          device.blindList,
+          ["position", "trigger"]
+        );
+        break;
+      case AccessoryTypes.airPurifier:
+        await this.updateDeviceSpecifics(
+          device.instanceId,
+          baseMqttPath,
+          device.airPurifierList,
+          [
+            "airQuality",
+            "controlsLocked",
+            "fanMode",
+            "fanSpeed",
+            "totalFilterLifetime",
+            "filterRuntime",
+            "filterRemainingLifetime",
+            "filterStatus",
+            "statusLEDs",
+            "totalMotorRuntime",
+          ]
+        );
+        break;
       case AccessoryTypes.lightbulb:
-        let lightValues: Array<keyof Light> = [
-          "onOff",
-          "powerFactor",
-          "colorTemperature",
-          "dimmer",
-        ];
-        for await (const key of lightValues) {
-          await this.updateIfChanged(
-            device.instanceId,
-            key,
-            this.toStringOrEmpty(device.lightList[0][key]),
-            baseMqttPath
-          );
-        }
+        await this.updateDeviceSpecifics(
+          device.instanceId,
+          baseMqttPath,
+          device.lightList,
+          ["onOff", "powerFactor", "colorTemperature", "dimmer"]
+        );
         break;
       case AccessoryTypes.motionSensor:
-        const sensorValues: Array<keyof Sensor> = [
-          "sensorType",
-          "minMeasuredValue",
-          "maxMeasuredValue",
-          "minRangeValue",
-          "maxRangeValue",
-          "resetMinMaxMeasureValue",
-          "sensorValue",
-        ];
-        for await (const key of sensorValues) {
-          await this.updateIfChanged(
-            device.instanceId,
-            key,
-            this.toStringOrEmpty(device.sensorList[0][key]),
-            baseMqttPath
-          );
-        }
+        await this.updateDeviceSpecifics(
+          device.instanceId,
+          baseMqttPath,
+          device.sensorList,
+          [
+            "sensorType",
+            "minMeasuredValue",
+            "maxMeasuredValue",
+            "minRangeValue",
+            "maxRangeValue",
+            "resetMinMaxMeasureValue",
+            "sensorValue",
+          ]
+        );
         break;
       case AccessoryTypes.plug:
-        const plugValues: Array<keyof Plug> = [
-          "onOff",
-          "powerFactor",
-          "dimmer",
-        ];
-        for await (const key of plugValues) {
-          await this.updateIfChanged(
-            device.instanceId,
-            key,
-            this.toStringOrEmpty(device.plugList[0][key]),
-            baseMqttPath
-          );
-        }
+        await this.updateDeviceSpecifics(
+          device.instanceId,
+          baseMqttPath,
+          device.plugList,
+          ["onOff", "powerFactor", "dimmer"]
+        );
         break;
+      default:
+        console.log(
+          `No handlers for dev type ${DEVICE_TYPES[device.type]}`,
+          device
+        );
+    }
+  }
+
+  private async updateDeviceSpecifics<T, K extends keyof T>(
+    instanceId: number,
+    basePath: string,
+    specifics: T[],
+    interest: K[]
+  ) {
+    for await (const specific of specifics) {
+      for await (const key of interest) {
+        await this.updateIfChanged(
+          instanceId,
+          key as string,
+          this.toStringOrEmpty(specific[key]),
+          basePath
+        );
+      }
     }
   }
 

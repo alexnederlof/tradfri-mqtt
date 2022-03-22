@@ -11,7 +11,13 @@ ADD src /app/src
 RUN yarn build
 
 RUN rm -rf node_modules
-RUN yarn install --prod
+RUN yarn install --prod \
+    && rm -rf node_modules/*/README.md \
+    && rm -rf node_modules/*/LICENSE \
+    && rm -rf node_modules/*/CONTRIBUTING* \
+    && rm -rf node_modules/*/CHANGELOG*  \
+    && rm -rf node_modules/*/doc*  
+
 
 FROM node:lts-slim as runner
 USER 1000

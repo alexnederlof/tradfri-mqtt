@@ -5,10 +5,12 @@ export interface AppConfig {
     address: string;
     user: string;
     password: string;
+    topicPrefix: string;
   };
   readonly gateway: {
     ip: string;
     psk: string;
+    identity: string;
   };
 }
 
@@ -18,10 +20,12 @@ export function parse(): AppConfig {
       address: getOrError("MQTT_ADDRESS"),
       user: getOrError("MQTT_USER"),
       password: getOrError("MQTT_PASSWORD"),
+      topicPrefix: process.env["MQTT_TOPIC_PREFIX"]?.trim() || "tradfri",
     },
     gateway: {
       ip: getOrError("TRADFRI_GATEWAY"),
       psk: getOrError("TRADFRI_PSK"),
+      identity: getOrError("TRADFRI_IDENTITY"),
     },
   };
 }

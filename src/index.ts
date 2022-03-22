@@ -1,6 +1,7 @@
 import { config as loadEnv, config } from "dotenv";
+import { IRouterHandler } from "express";
 import { Client as MqttClient, connect as newMqttClient } from "mqtt";
-import { Accessory, AccessoryTypes, TradfriClient } from "node-tradfri-client";
+import { TradfriClient } from "node-tradfri-client";
 import { Bridge } from "./Bridge";
 import { AppConfig, parse } from "./Config";
 
@@ -9,7 +10,7 @@ async function main() {
   const config = parse();
   const tradfri = await setupTradfriClient(config);
   const mqtt = await connectToMqtt(config);
-  const bridge = new Bridge(mqtt, tradfri);
+  const bridge = new Bridge(mqtt, tradfri, config);
 
   process.on("SIGTERM", () => bridge.stop);
   process.on("SIGINT", () => bridge.stop);
@@ -18,15 +19,11 @@ async function main() {
 }
 
 async function setupTradfriClient(config: AppConfig) {
-  const tradfri = new TradfriClient(config.gateway.ip);
-  console.log(`Authenticating with ${config.gateway.ip}`);
-  const identity = await tradfri.authenticate(config.gateway.psk);
-  console.log(`Auth successfull as ${identity.identity}. Connecting...`);
-  await tradfri.connect(identity.identity, identity.psk);
+  const { ip, identity, psk } = config.gateway;
+  console.log(`Connecting to Tradfri ${ip} as ${identity}`);
+  const tradfri = new TradfriClient(ip);
+  await tradfri.connect(identity, psk);
   console.log("Connected! Starting to listen to devices.");
-
-  const result = await tradfri.ping();
-  console.log("Ping is ", result);
   return tradfri;
 }
 
@@ -51,8 +48,31 @@ async function connectToMqtt(config: AppConfig) {
   });
 }
 
-console.log("Let's go");
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+async function getIdentity(host: string, token: string) {
+  console.log(`Authenticating to ${host}`);
+  const tradfri = new TradfriClient(host);
+  try {
+    const { identity, psk } = await tradfri.authenticate(token);
+    console.log(`Auth success:`);
+    console.log(`TRADFRI_IDENTITY=${identity}`);
+    console.log(`TRADFRI_PSK=${psk}`);
+    process.exit(0);
+  } catch (e) {
+    console.error("Auth failed: " + e, e);
+  }
+}
+
+let args = [...process.argv];
+if (args.includes("auth")) {
+  while (args.shift() !== "auth") {}
+  const [host, token] = args;
+  getIdentity(host, token).catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+} else {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
