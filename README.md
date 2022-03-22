@@ -38,7 +38,7 @@ need this along side the IP or hostname to login.
 To authenticate:
 
 - From the source code, run `yarn auth <gateway_ip> <psk>`
-- With docker, run `docker run alexnederlof/tradfri-mqtt auth <gateway_ip> <psk>`
+- With docker, run `docker run ghcr.io/alexnederlof/tradfri-mqtt auth <gateway_ip> <psk>`
 
 Not the identity and psk it returns, and use that in the configuration below.
 
