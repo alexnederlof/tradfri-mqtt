@@ -1,17 +1,14 @@
-name: Docker Image CI
+name: auto-merge
 
 on:
   pull_request:
-    branches: [main]
 
 jobs:
-  build:
+  auto-merge:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Build the Docker image
-        run: docker build . --file Dockerfile --tag alexnederlof/tradfri-mqtt
       - uses: ahmadnassri/action-dependabot-auto-merge@v2
         with:
-          target: minor # includes patch updates!
+          target: minor
           github-token: ${{ secrets.mytoken }}
