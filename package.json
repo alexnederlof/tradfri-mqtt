@@ -7,7 +7,7 @@
   "dependencies": {
     "dotenv": "^16.0.0",
     "mqtt": "^4.3.7",
-    "node-tradfri-client": "^3.1.0"
+    "node-tradfri-client": "^3.1.1"
   },
   "devDependencies": {
     "@tsconfig/node16": "^1.0.2",
