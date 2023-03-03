@@ -12,8 +12,8 @@ async function main() {
   const mqtt = await connectToMqtt(config);
   const bridge = new Bridge(mqtt, tradfri, config);
 
-  process.on("SIGTERM", () => bridge.stop);
-  process.on("SIGINT", () => bridge.stop);
+  process.on("SIGTERM", () => bridge.stop());
+  process.on("SIGINT", () => bridge.stop());
 
   bridge.start();
 }
