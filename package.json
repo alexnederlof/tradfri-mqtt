@@ -6,7 +6,7 @@
   "private": true,
   "dependencies": {
     "dotenv": "^16.1.4",
-    "mqtt": "^4.3.7",
+    "mqtt": "^5.0.1",
     "node-tradfri-client": "^3.2.0"
   },
   "devDependencies": {
