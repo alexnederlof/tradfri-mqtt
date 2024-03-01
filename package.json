@@ -5,7 +5,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "dotenv": "^16.4.1",
+    "dotenv": "^16.4.5",
     "mqtt": "^4.3.7",
     "node-tradfri-client": "^3.2.0"
   },
