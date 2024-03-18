@@ -12,7 +12,7 @@
   "devDependencies": {
     "@tsconfig/node16": "^16.1.1",
     "@types/express": "^4.17.21",
-    "@types/node": "^20.11.22",
+    "@types/node": "^20.11.28",
     "husky": "^8.0.3",
     "prettier": "^3.2.5",
     "pretty-quick": "^4.0.0",
